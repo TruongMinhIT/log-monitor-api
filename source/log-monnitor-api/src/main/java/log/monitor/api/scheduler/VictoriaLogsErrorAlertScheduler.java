@@ -1,19 +1,22 @@
 package log.monitor.api.scheduler;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import log.monitor.api.constant.BaseConstant;
 import log.monitor.api.service.SlackAlertService;
 import log.monitor.api.service.feign.FeignConst;
 import log.monitor.api.service.feign.FeignVictoriaLogsService;
-import log.monitor.api.dto.victorialogs.VictoriaLogsStatsResponse;
-import log.monitor.api.dto.victorialogs.VictoriaLogsStatsResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Slf4j
@@ -25,61 +28,66 @@ public class VictoriaLogsErrorAlertScheduler {
     @Autowired
     private SlackAlertService slackAlertService;
 
-    @Value("${victorialogs.query.window}")
-    private String window;
+    @Autowired
+    private ObjectMapper objectMapper;
 
-    @Value("${victorialogs.query.app-field}")
-    private String appField;
-
-    @Value("${victorialogs.query.error-field}")
-    private String errorField;
-
-    @Value("${victorialogs.query.error-value}")
-    private String errorValue;
-
-    @Value("${victorialogs.query.error-threshold}")
-    private int errorThreshold;
-
-    @Scheduled(cron = "${victorialogs.query.cron}")
+    @Scheduled(cron = "0 */5 * * * *")
     public void checkErrorRateAndAlert() {
         String query = buildQuery();
-        List<VictoriaLogsStatsResult> results;
+        Map<String, Integer> errorCountsByApp;
         try {
-            results = queryErrorCountsByApp(query);
+            errorCountsByApp = queryErrorCountsByApp(query);
         } catch (Exception e) {
             log.error("Failed to query VictoriaLogs [{}]", query, e);
             return;
         }
 
-        if (results.isEmpty()) {
-            log.debug("No app crossed the error threshold ({}) in the last {}", errorThreshold, window);
+        List<Map.Entry<String, Integer>> breaching = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : errorCountsByApp.entrySet()) {
+            if (entry.getValue() >= BaseConstant.VICTORIALOGS_ERROR_THRESHOLD) {
+                breaching.add(entry);
+            }
+        }
+
+        if (breaching.isEmpty()) {
+            log.debug("No app crossed the error threshold ({}) in the last {}",
+                    BaseConstant.VICTORIALOGS_ERROR_THRESHOLD, BaseConstant.VICTORIALOGS_QUERY_WINDOW);
             return;
         }
 
         List<String> lines = new ArrayList<>();
-        for (VictoriaLogsStatsResult result : results) {
-            lines.add(String.format(":red_circle: *%s* — %s lỗi trong %s", resolveAppName(result), result.getErrorCount(), window));
+        for (Map.Entry<String, Integer> entry : breaching) {
+            lines.add(String.format(":red_circle: *%s* — %d lỗi trong %s",
+                    entry.getKey(), entry.getValue(), BaseConstant.VICTORIALOGS_QUERY_WINDOW));
         }
         Collections.sort(lines);
 
-        String title = String.format("🚨 %d app vượt ngưỡng %d lỗi / %s", results.size(), errorThreshold, window);
+        String title = String.format("🚨 %d app vượt ngưỡng %d lỗi / %s",
+                breaching.size(), BaseConstant.VICTORIALOGS_ERROR_THRESHOLD, BaseConstant.VICTORIALOGS_QUERY_WINDOW);
         slackAlertService.sendMessage(title, lines);
     }
 
-    private String resolveAppName(VictoriaLogsStatsResult result) {
-        return result.getMetric() == null ? "unknown" : result.getMetric().getOrDefault(appField, "unknown");
-    }
-
-    private List<VictoriaLogsStatsResult> queryErrorCountsByApp(String query) {
-        VictoriaLogsStatsResponse response = feignVictoriaLogsService.statsQuery(FeignConst.LOGIN_TYPE_NO_AUTH, query);
-        if (response == null || response.getData() == null || response.getData().getResult() == null) {
-            return Collections.emptyList();
+    private Map<String, Integer> queryErrorCountsByApp(String query) throws Exception {
+        String rawBody = feignVictoriaLogsService.query(FeignConst.LOGIN_TYPE_NO_AUTH, query);
+        Map<String, Integer> counts = new HashMap<>();
+        if (rawBody == null || rawBody.trim().isEmpty()) {
+            return counts;
         }
-        return response.getData().getResult();
+
+        MappingIterator<Map<String, String>> lines = objectMapper
+                .readerFor(new TypeReference<Map<String, String>>() {})
+                .readValues(rawBody);
+        while (lines.hasNext()) {
+            Map<String, String> line = lines.next();
+            String app = line.getOrDefault(BaseConstant.VICTORIALOGS_QUERY_APP_FIELD, "unknown");
+            counts.merge(app, 1, Integer::sum);
+        }
+        return counts;
     }
 
     private String buildQuery() {
-        return String.format("_time:%s %s:%s | stats by (%s) count() as errors | filter errors:>=%d",
-                window, errorField, errorValue, appField, errorThreshold);
+        return String.format("_time:%s %s:%s | fields %s",
+                BaseConstant.VICTORIALOGS_QUERY_WINDOW, BaseConstant.VICTORIALOGS_ERROR_FIELD,
+                BaseConstant.VICTORIALOGS_ERROR_VALUE, BaseConstant.VICTORIALOGS_QUERY_APP_FIELD);
     }
 }

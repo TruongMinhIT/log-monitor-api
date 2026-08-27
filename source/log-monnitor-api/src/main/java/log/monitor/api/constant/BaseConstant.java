@@ -23,6 +23,13 @@ public class BaseConstant {
     public static final String SETTING_GROUP_NOTIFICATION = "notification";
     public static final String SETTING_KEY_SLACK_ERROR_ALERT = "slack_error_alert";
 
+    // VictoriaLogs error-alert scheduler query config
+    public static final String VICTORIALOGS_QUERY_APP_FIELD = "application";
+    public static final String VICTORIALOGS_QUERY_WINDOW = "5m";
+    public static final String VICTORIALOGS_ERROR_FIELD = "_msg";
+    public static final String VICTORIALOGS_ERROR_VALUE = "ERROR";
+    public static final Integer VICTORIALOGS_ERROR_THRESHOLD = 25;
+
     private BaseConstant() {
         throw new IllegalStateException("Utility class");
     }
