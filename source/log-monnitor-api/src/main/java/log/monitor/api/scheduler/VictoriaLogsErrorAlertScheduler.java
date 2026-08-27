@@ -85,7 +85,7 @@ public class VictoriaLogsErrorAlertScheduler {
         }
         Collections.sort(lines);
 
-        String title = String.format(" %d app vượt ngưỡng %d lỗi / %s", toAlert.size(), errorThreshold, window);
+        String title = String.format("🚨 %d app vượt ngưỡng %d lỗi / %s", toAlert.size(), errorThreshold, window);
         slackAlertService.sendMessage(title, lines);
     }
 
