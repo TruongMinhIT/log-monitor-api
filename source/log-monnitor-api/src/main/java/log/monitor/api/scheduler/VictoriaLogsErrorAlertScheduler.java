@@ -1,6 +1,7 @@
 package log.monitor.api.scheduler;
 
 import log.monitor.api.service.SlackAlertService;
+import log.monitor.api.service.feign.FeignConst;
 import log.monitor.api.service.feign.FeignVictoriaLogsService;
 import log.monitor.api.dto.victorialogs.VictoriaLogsStatsResponse;
 import log.monitor.api.dto.victorialogs.VictoriaLogsStatsResult;
@@ -70,7 +71,7 @@ public class VictoriaLogsErrorAlertScheduler {
     }
 
     private List<VictoriaLogsStatsResult> queryErrorCountsByApp(String query) {
-        VictoriaLogsStatsResponse response = feignVictoriaLogsService.statsQuery(query);
+        VictoriaLogsStatsResponse response = feignVictoriaLogsService.statsQuery(FeignConst.LOGIN_TYPE_NO_AUTH, query);
         if (response == null || response.getData() == null || response.getData().getResult() == null) {
             return Collections.emptyList();
         }

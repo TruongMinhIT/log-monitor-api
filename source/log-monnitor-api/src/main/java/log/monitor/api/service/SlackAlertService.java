@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import log.monitor.api.constant.BaseConstant;
 import log.monitor.api.model.Setting;
 import log.monitor.api.repository.SettingRepository;
+import log.monitor.api.service.feign.FeignConst;
 import log.monitor.api.service.feign.FeignSlackService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +50,8 @@ public class SlackAlertService {
             }
 
             Map<String, Object> payload = buildPayload(channel, title, lines);
-            Map<String, Object> response = feignSlackService.postMessage(BaseConstant.AUTH_BEARER_TOKEN + token, payload);
+            Map<String, Object> response = feignSlackService.postMessage(
+                    BaseConstant.AUTH_BEARER_TOKEN + token, FeignConst.LOGIN_TYPE_NO_AUTH, payload);
             if (response != null && Boolean.FALSE.equals(response.get("ok"))) {
                 log.error("Slack API rejected the message: {}", response.get("error"));
             }

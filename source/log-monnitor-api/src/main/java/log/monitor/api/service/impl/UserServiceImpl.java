@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 public class UserServiceImpl {
     public String getCurrentToken() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && !(authentication instanceof AnonymousAuthenticationToken)) {
+        if (!(authentication instanceof AnonymousAuthenticationToken)) {
             OAuth2AuthenticationDetails oauthDetails =
                     (OAuth2AuthenticationDetails) authentication.getDetails();
             if (oauthDetails != null) {

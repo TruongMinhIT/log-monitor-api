@@ -30,13 +30,16 @@ public class OAuth2FeignRequestInterceptor implements RequestInterceptor {
     @Override
     public void apply(RequestTemplate template) {
         if (template.headers().containsKey(FeignSSOService.LOGIN_TYPE)) {
-            if (Objects.equals(template.headers().get(FeignSSOService.LOGIN_TYPE).toArray()[0], FeignConst.LOGIN_TYPE_INTERNAL)) {
+            Object loginType = template.headers().get(FeignSSOService.LOGIN_TYPE).toArray()[0];
+            if (Objects.equals(loginType, FeignConst.LOGIN_TYPE_INTERNAL)) {
                 String auth = internalAuthUsername + ":" + internalAuthPassword;
                 log.error("-----------> internal = " + auth);
                 byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(StandardCharsets.UTF_8));
                 template.header(AUTHORIZATION_HEADER, String.format("%s %s", BASIC_AUTH_TYPE, new String(encodedAuth)));
+            } else if (Objects.equals(loginType, FeignConst.LOGIN_TYPE_NO_AUTH)) {
+                // external/third-party API
             } else {
-                log.error("-----------> not found type = " + template.headers().get(FeignSSOService.LOGIN_TYPE).toArray()[0]);
+                log.error("-----------> not found type = " + loginType);
             }
             template.removeHeader(FeignSSOService.LOGIN_TYPE);
         } else {

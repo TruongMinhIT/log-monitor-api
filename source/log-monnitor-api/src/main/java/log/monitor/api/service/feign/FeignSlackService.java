@@ -13,5 +13,6 @@ import java.util.Map;
 public interface FeignSlackService {
     @PostMapping(value = "/chat.postMessage", consumes = MediaType.APPLICATION_JSON_VALUE)
     Map<String, Object> postMessage(@RequestHeader("Authorization") String bearerToken,
+                                     @RequestHeader(FeignSSOService.LOGIN_TYPE) String loginType,
                                      @RequestBody Map<String, Object> payload);
 }
